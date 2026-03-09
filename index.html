@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Image to Compressed PDF</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; box-shadow: 2px 2px 10px #eee; }
+        input, button { margin: 10px 0; display: block; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Image to PDF Converter</h2>
+    <input type="file" id="imageInput" accept="image/*">
+    <input type="email" id="emailInput" placeholder="Enter your email">
+    <button onclick="generatePDF(false)">Download PDF</button>
+    <button onclick="generatePDF(true)">Send to Email</button>
+    <p id="status"></p>
+</div>
+
+<script>
+    const { jsPDF } = window.jspdf;
+
+    // Load saved email on startup
+    window.onload = () => {
+        const savedEmail = localStorage.getItem('userEmail');
+        if (savedEmail) document.getElementById('emailInput').value = savedEmail;
+    };
+
+    async function generatePDF(sendEmail) {
+        const fileInput = document.getElementById('imageInput');
+        const emailInput = document.getElementById('emailInput');
+        const status = document.getElementById('status');
+
+        if (!fileInput.files[0]) return alert("Please select an image");
+        if (sendEmail && !emailInput.value) return alert("Please enter an email");
+
+        // Save email to local storage
+        localStorage.setItem('userEmail', emailInput.value);
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+reader.onload = async (e) => {
+    const img = new Image();
+    img.src = e.target.result;
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 1. Scale down the resolution (Optional: 0.7 = 70% of original size)
+        const scaleFactor = 0.7; 
+        canvas.width = img.width * scaleFactor;
+        canvas.height = img.height * scaleFactor;
+
+        // 2. Draw image to canvas
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // 3. Export as JPEG with low quality (0.1 to 1.0)
+        // 0.3 is very compressed; 0.7 is a good balance.
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.5);
+
+        const pdf = new jsPDF();
+        
+        // Add the ALREADY compressed image to the PDF
+        // We use 'FAST' to prevent jsPDF from trying to process it further
+        pdf.addImage(compressedDataUrl, 'JPEG', 10, 10, 180, 150, undefined, 'FAST');
+
+        if (sendEmail) {
+            status.innerText = "Sending...";
+            const pdfBase64 = pdf.output('datauristring').split(',')[1];
+            sendToServer(pdfBase64, emailInput.value);
+        } else {
+            pdf.save("compressed.pdf");
+        }
+    };
+};
+        reader.readAsDataURL(file);
+    }
+
+    async function sendToServer(base64, email) {
+        try {
+            const response = await fetch('http://localhost:3000/send-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pdf: base64, email: email })
+            });
+            const result = await response.text();
+            document.getElementById('status').innerText = result;
+        } catch (err) {
+            document.getElementById('status').innerText = "Error: Backend not running";
+        }
+    }
+</script>
+</body>
+</html>
