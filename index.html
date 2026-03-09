@@ -83,7 +83,7 @@ reader.onload = async (e) => {
 
     async function sendToServer(base64, email) {
         try {
-            const response = await fetch('http://34.88.135.102:3000/send-pdf', {
+            const response = await fetch('/send-pdf', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pdf: base64, email: email })
